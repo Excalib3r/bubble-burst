@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Burst (1997) - Deluxe Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            touch-action: none;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            user-select: none
+        }
+
+        canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%
+        }
+
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: none;
+            padding: 16px 20px;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none
+        }
+
+        #hud.visible {
+            display: flex
+        }
+
+        .hud-box {
+            background: rgba(255, 255, 255, .1);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 16px;
+            padding: 8px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .hud-box.mult-active {
+            border-color: #ff4500;
+            box-shadow: 0 0 20px rgba(255, 69, 0, 0.6);
+        }
+
+        .hud-box.freeze-active {
+            border-color: #0ff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+        }
+
+        .hud-label {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .15em;
+            text-transform: uppercase
+        }
+
+        .hud-val {
+            font-size: 26px;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1;
+            font-variant-numeric: tabular-nums
+        }
+
+        .hud-left {
+            display: flex;
+            gap: 10px
+        }
+
+        #lbl-score {
+            color: #06b6d4
+        }
+
+        #lbl-level {
+            color: #d946ef
+        }
+
+        #lbl-lives {
+            color: #f43f5e
+        }
+
+        #prog-bar {
+            width: 100%;
+            height: 3px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, .1);
+            overflow: hidden;
+            margin-top: 3px
+        }
+
+        #prog-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #06b6d4, #d946ef);
+            transition: width .3s
+        }
+
+        #hearts {
+            display: flex;
+            gap: 5px;
+            align-items: center
+        }
+
+        .heart {
+            width: 22px;
+            height: 22px;
+            transition: transform .15s, opacity .15s
+        }
+
+        .heart.empty {
+            opacity: .2
+        }
+
+        .heart.pop {
+            animation: heartpop .35s ease
+        }
+
+        @keyframes heartpop {
+            0% {
+                transform: scale(1)
+            }
+
+            40% {
+                transform: scale(1.5)
+            }
+
+            100% {
+                transform: scale(1)
+            }
+        }
+
+        /* Active Powers HUD */
+        #powers-hud {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
+            pointer-events: none
+        }
+
+        .power-bar {
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            padding: 6px 12px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px)
+        }
+
+        .power-bar.active {
+            display: flex
+        }
+
+        .power-text {
+            font-size: 11px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: 0.1em;
+            width: 80px
+        }
+
+        .power-track {
+            width: 100px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden
+        }
+
+        .power-fill {
+            height: 100%;
+            width: 100%;
+            transform-origin: left;
+            transition: transform 0.1s linear
+        }
+
+        #fill-freeze {
+            background: #0ff;
+        }
+
+        #fill-mult {
+            background: #ff4500;
+        }
+
+        /* Overlay screens */
+        .screen {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            text-align: center;
+            background: rgba(0, 0, 0, .85);
+            backdrop-filter: blur(24px);
+            color: #fff
+        }
+
+        .screen.hidden {
+            display: none
+        }
+
+        h1 {
+            font-size: clamp(44px, 10vw, 80px);
+            font-weight: 900;
+            font-style: italic;
+            letter-spacing: -.03em;
+            line-height: 1
+        }
+
+        .subtitle {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .35em;
+            text-transform: uppercase;
+            opacity: .5;
+            margin-top: 8px
+        }
+
+        .btn-primary {
+            margin-top: 28px;
+            width: min(340px, 85vw);
+            background: linear-gradient(135deg, #06b6d4, #d946ef);
+            border: none;
+            border-radius: 999px;
+            padding: 18px 0;
+            font-size: 18px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 0 40px rgba(217, 70, 239, .45);
+            transition: transform .1s, box-shadow .2s
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 60px rgba(217, 70, 239, .65)
+        }
+
+        .btn-primary:active {
+            transform: scale(.95)
+        }
+
+        .btn-secondary {
+            margin-top: 12px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, .4);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            cursor: pointer;
+            padding: 8px;
+            transition: color .15s
+        }
+
+        .btn-secondary:hover {
+            color: rgba(255, 255, 255, .7)
+        }
+
+        /* Level map */
+        #level-map {
+            width: min(320px, 85vw);
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 40vh;
+            overflow-y: auto;
+            padding-right: 4px
+        }
+
+        .level-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            padding: 8px 14px
+        }
+
+        .level-name {
+            font-size: 11px;
+            font-weight: 900;
+            color: #d946ef;
+            width: 42px;
+            text-align: left
+        }
+
+        .level-desc {
+            flex: 1;
+            font-size: 10px;
+            color: rgba(255, 255, 255, .6);
+            text-align: left;
+            line-height: 1.3
+        }
+
+        .level-pts {
+            font-size: 10px;
+            color: rgba(255, 255, 255, .3);
+            width: 45px;
+            text-align: right
+        }
+
+        /* Initials entry & High Score */
+        #hs-table {
+            width: min(320px, 85vw);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .1);
+            margin: 16px 0
+        }
+
+        .hs-header {
+            background: rgba(234, 179, 8, .1);
+            border-bottom: 1px solid rgba(255, 255, 255, .08);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            color: #facc15
+        }
+
+        .hs-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, .04);
+            font-size: 11px
+        }
+
+        .hs-row:last-child {
+            border-bottom: none
+        }
+
+        .hs-rank {
+            width: 32px;
+            font-weight: 900
+        }
+
+        .hs-score {
+            flex: 1;
+            text-align: right;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums
+        }
+
+        .hs-lvl {
+            width: 36px;
+            text-align: right;
+            color: #d946ef;
+            font-weight: 700
+        }
+
+        .hs-new {
+            color: #facc15
+        }
+
+        #screen-initials {
+            z-index: 35
+        }
+
+        .init-prompt {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .35em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .5);
+            margin: 8px 0 20px
+        }
+
+        .init-score-preview {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: .1em;
+            color: rgba(255, 255, 255, .35);
+            margin-bottom: 20px
+        }
+
+        .init-slots {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 28px
+        }
+
+        .init-slot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px
+        }
+
+        .init-arrow {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, .35);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 12px;
+            border-radius: 8px;
+            transition: color .15s, background .15s;
+            line-height: 1
+        }
+
+        .init-arrow:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, .08)
+        }
+
+        .init-letter {
+            width: 70px;
+            height: 80px;
+            background: rgba(255, 255, 255, .06);
+            border: 2px solid rgba(255, 255, 255, .15);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 52px;
+            font-weight: 900;
+            color: #fff;
+            transition: border-color .15s, box-shadow .15s;
+            font-family: monospace
+        }
+
+        .init-letter.active {
+            border-color: #d946ef;
+            box-shadow: 0 0 20px rgba(217, 70, 239, .4);
+            color: #d946ef
+        }
+
+        .init-hint {
+            font-size: 10px;
+            color: rgba(255, 255, 255, .25);
+            font-weight: 700;
+            letter-spacing: .08em;
+            margin-top: 4px
+        }
+
+        #final-stats {
+            display: flex;
+            gap: 12px;
+            margin: 12px 0
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .15);
+            border-radius: 16px;
+            padding: 12px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center
+        }
+
+        .stat-label {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            margin-bottom: 4px
+        }
+
+        .stat-val {
+            font-size: 36px;
+            font-weight: 900;
+            line-height: 1
+        }
+
+        /* Hand prompt & Loading */
+        #hand-prompt {
+            position: fixed;
+            bottom: 64px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            display: none;
+            background: rgba(217, 70, 239, .9);
+            color: #000;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .2em;
+            padding: 12px 28px;
+            border-radius: 999px;
+            animation: bounce 1s infinite;
+            box-shadow: 0 0 30px rgba(217, 70, 239, .5);
+            white-space: nowrap
+        }
+
+        #hand-prompt.visible {
+            display: block
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateX(-50%) translateY(0)
+            }
+
+            50% {
+                transform: translateX(-50%) translateY(-8px)
+            }
+        }
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px
+        }
+
+        #loading.hidden {
+            display: none
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(217, 70, 239, .2);
+            border-top-color: #d946ef;
+            border-radius: 50%;
+            animation: spin .8s linear infinite
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .load-txt {
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .4em;
+            text-transform: uppercase;
+            color: rgba(217, 70, 239, .7);
+            text-align: center;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Loading & Camera Requirement State -->
+    <div id="loading">
+        <div class="spinner" id="loading-spinner"></div>
+        <p class="load-txt" id="loading-text">Loading Tracking & Camera...</p>
+    </div>
+
+    <!-- Active Powerups HUD -->
+    <div id="powers-hud">
+        <div class="power-bar" id="bar-freeze">
+            <span class="power-text">❄️ FREEZE</span>
+            <div class="power-track">
+                <div class="power-fill" id="fill-freeze"></div>
+            </div>
+        </div>
+        <div class="power-bar" id="bar-mult">
+            <span class="power-text">🔥 2X SCORE</span>
+            <div class="power-track">
+                <div class="power-fill" id="fill-mult"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-left">
+            <div class="hud-box" id="box-score">
+                <span class="hud-label" id="lbl-score">Score</span>
+                <span class="hud-val" id="val-score">0</span>
+            </div>
+            <div class="hud-box" id="box-level">
+                <span class="hud-label" id="lbl-level">Level</span>
+                <span class="hud-val" id="val-level">1</span>
+                <div id="prog-bar">
+                    <div id="prog-fill" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="hud-box">
+            <span class="hud-label" id="lbl-lives">Lives</span>
+            <div id="hearts"></div>
+        </div>
+    </div>
+
+    <canvas id="c"></canvas>
+    <div id="hand-prompt">Show Hand to Camera</div>
+
+    <!-- Menu Screen -->
+    <div class="screen" id="screen-menu">
+        <h1>BUBBLE<span style="color:#d946ef">BURST</span></h1>
+        <p class="subtitle">Deluxe Edition</p>
+        <div id="level-map"></div>
+        <button class="btn-primary" onclick="startGame()" id="start-btn" disabled
+            style="opacity:0.5; cursor:not-allowed;">▶ Waiting for Camera...</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="screen hidden" id="screen-gameover">
+        <div style="font-size:52px;margin-bottom:4px">💥</div>
+        <h1>GAME<span style="color:#f43f5e"> OVER</span></h1>
+        <p class="subtitle">Better luck next time</p>
+        <div id="final-stats">
+            <div class="stat-box">
+                <span class="stat-label" style="color:#06b6d4">Score</span>
+                <span class="stat-val" id="final-score">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label" style="color:#d946ef">Level</span>
+                <span class="stat-val" id="final-level">1</span>
+            </div>
+        </div>
+        <div id="hs-table">
+            <div class="hs-header">🏆 High Scores</div>
+            <div id="hs-rows"></div>
+        </div>
+        <button class="btn-primary" onclick="startGame()">▶ Play Again</button>
+        <button class="btn-secondary" onclick="showMenu()">← Main Menu</button>
+    </div>
+
+    <!-- Initials Entry Screen -->
+    <div class="screen hidden" id="screen-initials">
+        <div style="font-size:44px;margin-bottom:4px">🏆</div>
+        <h1>ENTER<span style="color:#d946ef"> NAME</span></h1>
+        <p class="init-prompt">Your Score</p>
+        <p class="init-score-preview" id="init-score-display"></p>
+        <div class="init-slots">
+            <div class="init-slot">
+                <button class="init-arrow" onclick="nudgeLetter(0,1)">▲</button>
+                <div class="init-letter active" id="il0">A</div>
+                <button class="init-arrow" onclick="nudgeLetter(0,-1)">▼</button>
+            </div>
+            <div class="init-slot">
+                <button class="init-arrow" onclick="nudgeLetter(1,1)">▲</button>
+                <div class="init-letter" id="il1">A</div>
+                <button class="init-arrow" onclick="nudgeLetter(1,-1)">▼</button>
+            </div>
+            <div class="init-slot">
+                <button class="init-arrow" onclick="nudgeLetter(2,1)">▲</button>
+                <div class="init-letter" id="il2">A</div>
+                <button class="init-arrow" onclick="nudgeLetter(2,-1)">▼</button>
+            </div>
+        </div>
+        <p class="init-hint">Type letters or use arrows · Enter to confirm</p>
+        <button class="btn-primary" onclick="confirmInitials()">✓ Save Score</button>
+    </div>
+
+    <video id="vid" style="display:none" playsinline muted></video>
+
+    <script>
+        // ─── Constants & Progression Map ──────────────────────────────────────────────
+        const MAX_LEVELS = 5, MAX_LIVES = 3, PTS_PER_LEVEL = 25;
+        const LEVEL_DATA = [
+            { name: 'Basics', desc: 'Pop bubbles, don\'t let them drop.' },
+            { name: 'Danger', desc: 'Dodge 💣 Bombs (loses a life).' },
+            { name: 'Strategy', desc: 'Adds ⭐ Gold, ❄️ Freeze, 🫧 Split bubbles.' },
+            { name: 'Chaos', desc: 'Adds 🛡️ Shields & Zigzag movements.' },
+            { name: 'MAX', desc: 'Insane speed + 🔥 2x Score multipliers!' },
+        ];
+
+        // ─── Storage ──────────────────────────────────────────────────────────────────
+        const getHS = () => { try { return JSON.parse(localStorage.getItem('bb97dx') || '[]'); } catch { return []; } };
+        const saveHS = (sc, lv, initials) => {
+            const a = getHS();
+            a.push({ score: sc, level: Math.min(lv, MAX_LEVELS), initials: initials || '???', date: new Date().toLocaleDateString() });
+            a.sort((a, b) => b.score - a.score);
+            try {
+                localStorage.setItem('bb97dx', JSON.stringify(a.slice(0, 5)));
+            } catch (e) {
+                console.warn("Could not save score to local storage (sandbox environment).", e);
+            }
+        };
+
+        // ─── Initials Entry ───────────────────────────────────────────────────────────
+        const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let initLetters = [0, 0, 0];
+        let initCursor = 0;
+        let initScreenScore = 0, initScreenLevel = 1;
+        const initSlots = [document.getElementById('il0'), document.getElementById('il1'), document.getElementById('il2')];
+
+        function renderInitSlots() {
+            initSlots.forEach((el, i) => {
+                el.textContent = ALPHA[initLetters[i]];
+                el.className = 'init-letter' + (i === initCursor ? ' active' : '');
+            });
+        }
+        function nudgeLetter(slot, dir) {
+            initLetters[slot] = (initLetters[slot] + dir + 26) % 26;
+            initCursor = slot;
+            renderInitSlots();
+        }
+        function showInitials(sc, lv) {
+            initScreenScore = sc; initScreenLevel = lv;
+            initLetters = [0, 0, 0]; initCursor = 0;
+            renderInitSlots();
+            document.getElementById('init-score-display').textContent = `Score: ${sc}  ·  Level: ${Math.min(lv, MAX_LEVELS)}${lv >= MAX_LEVELS ? '★' : ''}`;
+            document.getElementById('screen-initials').classList.remove('hidden');
+        }
+        function confirmInitials() {
+            const initials = initLetters.map(i => ALPHA[i]).join('');
+            saveHS(initScreenScore, initScreenLevel, initials);
+            document.getElementById('screen-initials').classList.add('hidden');
+            _renderGameOver(initScreenScore, initScreenLevel, initials);
+            gameoverEl.classList.remove('hidden');
+        }
+
+        // ─── DOM refs ─────────────────────────────────────────────────────────────────
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const hud = document.getElementById('hud');
+        const valScore = document.getElementById('val-score');
+        const valLevel = document.getElementById('val-level');
+        const progFill = document.getElementById('prog-fill');
+        const heartsEl = document.getElementById('hearts');
+        const handPrompt = document.getElementById('hand-prompt');
+        const loadingEl = document.getElementById('loading');
+        const menuEl = document.getElementById('screen-menu');
+        const gameoverEl = document.getElementById('screen-gameover');
+        const finalScoreEl = document.getElementById('final-score');
+        const finalLevelEl = document.getElementById('final-level');
+        const hsRowsEl = document.getElementById('hs-rows');
+        const boxScore = document.getElementById('box-score');
+
+        // Powerup bars
+        const barFreeze = document.getElementById('bar-freeze');
+        const fillFreeze = document.getElementById('fill-freeze');
+        const barMult = document.getElementById('bar-mult');
+        const fillMult = document.getElementById('fill-mult');
+
+        // ─── Build level map ──────────────────────────────────────────────────────────
+        (function buildLevelMap() {
+            const el = document.getElementById('level-map');
+            for (let i = 0; i < MAX_LEVELS; i++) {
+                el.innerHTML += `<div class="level-row">
+      <span class="level-name">LVL ${i + 1}</span>
+      <span class="level-desc">${LEVEL_DATA[i].desc}</span>
+      <span class="level-pts">${i * PTS_PER_LEVEL}+</span>
+    </div>`;
+            }
+        })();
+
+        // ─── Hearts ───────────────────────────────────────────────────────────────────
+        const heartSVG = (filled) =>
+            `<svg viewBox="0 0 24 24" fill="${filled ? '#f43f5e' : 'none'}" stroke="#f43f5e" stroke-width="2.5" style="width:100%;height:100%"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+
+        function renderHearts(currentLives, poppedIdx) {
+            heartsEl.innerHTML = '';
+            const slots = Math.max(MAX_LIVES, currentLives);
+            for (let i = 0; i < slots; i++) {
+                const d = document.createElement('div');
+                d.className = 'heart' + (i >= currentLives ? ' empty' : '') + (i === poppedIdx ? ' pop' : '');
+                d.innerHTML = heartSVG(i < currentLives);
+                heartsEl.appendChild(d);
+            }
+        }
+
+        // ─── Game State ───────────────────────────────────────────────────────────────
+        let W, H, baseR;
+        let running = false;
+        let score = 0, level = 1, lives = MAX_LIVES;
+        let bubbles = [], particles = [], comboTexts = [];
+        let trail = [], lerpX = 0, lerpY = 0;
+        let fingerX = null, fingerY = null;
+        let lastSpawn = 0, lastSlice = 0, comboCount = 0;
+        let shake = 0, timeScale = 1;
+        let levelUpLife = 0, missLife = 0;
+        let lastFrame = 0;
+        let freezeLeft = 0, multiplierLeft = 0;
+        let aiReady = false;
+
+        let audioCtx = null;
+        const POOL_SIZE = 250;
+        const pPool = Array.from({ length: POOL_SIZE }, () => ({ active: false }));
+
+        function spawnParticle(x, y, color, speedScale = 1) {
+            for (let p of pPool) {
+                if (!p.active) {
+                    p.active = true; p.x = x; p.y = y;
+                    const responsiveSpeed = Math.max(W, H) * 0.012 * speedScale;
+                    p.vx = (Math.random() - .5) * responsiveSpeed;
+                    p.vy = (Math.random() - .5) * responsiveSpeed;
+                    p.color = color; p.life = 1;
+                    return;
+                }
+            }
+        }
+
+        // ─── Audio ────────────────────────────────────────────────────────────────────
+        function ensureAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playTone(freq, type, duration, vol = 0.2, slideTo = null) {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+            const now = audioCtx.currentTime;
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            o.type = type;
+            o.frequency.setValueAtTime(freq, now);
+            if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+            g.gain.setValueAtTime(vol, now);
+            g.gain.exponentialRampToValueAtTime(.01, now + duration);
+            o.connect(g); g.connect(audioCtx.destination);
+            o.start(now); o.stop(now + duration + 0.1);
+        }
+
+        function playPop(mult = 1) { playTone(600 + mult * 150, 'sine', 0.1, 0.3, 100); }
+        function playBomb() { playTone(150, 'sawtooth', 0.5, 0.5, 40); }
+        function playPowerup() {
+            [400, 600, 800].forEach((f, i) => { setTimeout(() => playTone(f, 'sine', 0.15, 0.2), i * 80); });
+        }
+        function playLevelUp() {
+            [400, 500, 600, 800].forEach((f, i) => { setTimeout(() => playTone(f, 'square', 0.1, 0.2), i * 100); });
+        }
+        function playMiss() { playTone(200, 'sawtooth', 0.3, 0.25, 60); }
+        function playGameOver() {
+            [300, 250, 200, 150].forEach((f, i) => { setTimeout(() => playTone(f, 'square', 0.15, 0.2), i * 120); });
+        }
+
+        // ─── Resize ───────────────────────────────────────────────────────────────────
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            baseR = Math.max(10, Math.min(W, H) * .08);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // ─── Bubble Factory ───────────────────────────────────────────────────────────
+        function mkBubble(lvl, overrideType = null, bx = null, by = null, bvy = null) {
+            const scale = lvl >= 5 ? 0.35 : Math.max(0.4, 1 - (lvl - 1) * 0.15);
+            let r = baseR * scale * (.8 + Math.random() * .4);
+            let x = bx !== null ? bx : Math.random() * (W * .8) + W * .1;
+            let y = by !== null ? by : H + r + 10;
+
+            // Responsive speeds proportional to screen size
+            let baseVx = W * 0.001;
+            let baseVy = H * 0.012;
+
+            let vx = (x < W / 2 ? 1 : -1) * (Math.random() * baseVx + baseVx);
+            const speedMult = lvl >= 5 ? 1.5 : 1 + (lvl - 1) * .12;
+            let vy = bvy !== null ? bvy : -(Math.random() * (baseVy * 0.5) + baseVy) * speedMult;
+
+            let type = overrideType || 'normal';
+            let zigzag = false;
+
+            if (!overrideType) {
+                let roll = Math.random();
+                if (lvl >= 5 && roll < 0.05) type = 'multiplier';
+                else if (lvl >= 4 && roll < 0.08) type = 'shield';
+                else if (lvl >= 3 && roll < 0.14) type = 'freeze';
+                else if (lvl >= 3 && roll < 0.22) type = 'gold';
+                else if (lvl >= 3 && roll < 0.35) type = 'split';
+                else if (lvl >= 2 && roll < (lvl >= 4 ? 0.60 : 0.45)) type = 'bomb';
+
+                if (lvl >= 4 && type === 'normal' && Math.random() < 0.3) zigzag = true;
+            }
+
+            let color = 'rgba(255,255,255,0.6)', solid = '#fff', icon = '';
+
+            if (type === 'normal') {
+                const hues = [190, 200, 280, 320, 160];
+                const hue = hues[Math.floor(Math.random() * hues.length)];
+                color = `hsla(${hue},90%,60%,.6)`; solid = `hsl(${hue},90%,60%)`;
+            }
+            else if (type === 'mini') { color = 'rgba(0,180,180,0.6)'; solid = '#0ff'; r *= 0.6; }
+            else if (type === 'bomb') { color = 'rgba(200,0,0,0.85)'; solid = '#f00'; r *= 1.1; icon = '💣'; }
+            else if (type === 'gold') { color = 'rgba(255,215,0,0.8)'; solid = '#ffd700'; r *= 0.6; vy *= 1.4; icon = '⭐'; }
+            else if (type === 'freeze') { color = 'rgba(100,200,255,0.8)'; solid = '#0ff'; icon = '❄️'; }
+            else if (type === 'shield') { color = 'rgba(50,255,100,0.8)'; solid = '#0f0'; icon = '🛡️'; }
+            else if (type === 'multiplier') { color = 'rgba(255,100,0,0.8)'; solid = '#ff4500'; icon = '🔥'; }
+            else if (type === 'split') { color = 'rgba(0,180,180,0.8)'; solid = '#0ff'; r *= 1.4; icon = '🫧'; }
+
+            return { type, r, x, y, baseX: x, vx, vy, color, solid, icon, zigzag, seed: Math.random() * 100, burst: false, escaped: false };
+        }
+
+        // ─── HUD update ───────────────────────────────────────────────────────────────
+        function updateHUD() {
+            valScore.textContent = score;
+            const displayLevel = Math.min(level, MAX_LEVELS);
+            valLevel.textContent = displayLevel >= MAX_LEVELS ? displayLevel + '★' : displayLevel;
+            const base = (displayLevel - 1) * PTS_PER_LEVEL;
+            const pct = displayLevel >= MAX_LEVELS ? 100 : Math.min(100, (score - base) / PTS_PER_LEVEL * 100);
+            progFill.style.width = pct + '%';
+
+            if (multiplierLeft > 0) boxScore.classList.add('mult-active'); else boxScore.classList.remove('mult-active');
+            if (freezeLeft > 0) hud.classList.add('freeze-active'); else hud.classList.remove('freeze-active');
+
+            if (freezeLeft > 0) { barFreeze.classList.add('active'); fillFreeze.style.transform = `scaleX(${freezeLeft / 4000})`; }
+            else barFreeze.classList.remove('active');
+
+            if (multiplierLeft > 0) { barMult.classList.add('active'); fillMult.style.transform = `scaleX(${multiplierLeft / 10000})`; }
+            else barMult.classList.remove('active');
+        }
+
+        // ─── Screens ──────────────────────────────────────────────────────────────────
+        function showMenu() {
+            running = false;
+            hud.classList.remove('visible');
+            document.getElementById('powers-hud').style.display = 'none';
+            menuEl.classList.remove('hidden');
+            gameoverEl.classList.add('hidden');
+            document.getElementById('screen-initials').classList.add('hidden');
+            handPrompt.classList.remove('visible');
+        }
+
+        function showGameOver() {
+            if (!running) return;
+            running = false;
+            playGameOver();
+            hud.classList.remove('visible');
+            document.getElementById('powers-hud').style.display = 'none';
+            handPrompt.classList.remove('visible');
+            showInitials(score, level);
+        }
+
+        function _renderGameOver(sc, lv, initials) {
+            const displayLv = Math.min(lv, MAX_LEVELS);
+            finalScoreEl.textContent = sc;
+            finalLevelEl.textContent = displayLv >= MAX_LEVELS ? displayLv + '★' : displayLv;
+
+            const scores = getHS();
+            const medals = ['🥇', '🥈', '🥉'];
+            hsRowsEl.innerHTML = scores.map((hs, i) => {
+                const isNew = hs.initials === initials && hs.score === sc && i === scores.findIndex(x => x.score === sc && x.initials === initials);
+                return `<div class="hs-row ${isNew ? 'hs-new' : ''}">
+      <span class="hs-rank">${medals[i] || (i + 1) + '.'}</span>
+      <span class="hs-initials" style="width:42px;font-weight:900;font-family:monospace;letter-spacing:.08em;color:${isNew ? '#facc15' : '#d946ef'}">${hs.initials || '???'}</span>
+      <span class="hs-score">${hs.score}</span>
+      <span class="hs-lvl">${hs.level}</span>
+    </div>`;
+            }).join('') || '<div class="hs-row" style="color:rgba(255,255,255,.3);justify-content:center">No scores yet</div>';
+        }
+
+        // ─── Start ────────────────────────────────────────────────────────────────────
+        function startGame() {
+            if (!aiReady) return; // Prevent start if camera isn't ready
+
+            ensureAudio();
+            score = 0; level = 1; lives = MAX_LIVES;
+            freezeLeft = 0; multiplierLeft = 0;
+            bubbles = []; comboTexts = []; trail = [];
+            comboCount = 0; shake = 0; timeScale = 1;
+            levelUpLife = 0; missLife = 0;
+            lastSpawn = performance.now();
+            for (let p of pPool) p.active = false;
+
+            menuEl.classList.add('hidden');
+            gameoverEl.classList.add('hidden');
+            document.getElementById('screen-initials').classList.add('hidden');
+
+            document.getElementById('powers-hud').style.display = 'flex';
+            hud.classList.add('visible');
+            renderHearts(lives, null);
+            updateHUD();
+            running = true;
+        }
+
+        // ─── Lose life ────────────────────────────────────────────────────────────────
+        function loseLife() {
+            if (lives <= 0 || !running) return;
+            const idx = lives - 1;
+            lives--;
+            missLife = 2.0;
+            shake = 18;
+            playMiss();
+
+            try { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch (e) { }
+
+            renderHearts(lives, idx);
+            if (lives <= 0) setTimeout(showGameOver, 600);
+        }
+
+        // ─── Main loop ────────────────────────────────────────────────────────────────
+        function loop(now) {
+            requestAnimationFrame(loop);
+            if (!running) return;
+
+            let dt = (now - lastFrame) / 16.67;
+            if (dt > 4 || dt < 0) dt = 1;
+            lastFrame = now;
+
+            const eDt = dt * timeScale;
+            if (timeScale < 1) timeScale = Math.min(1, timeScale + .05);
+
+            if (freezeLeft > 0) freezeLeft -= dt * 16.67;
+            if (multiplierLeft > 0) multiplierLeft -= dt * 16.67;
+            updateHUD();
+
+            // Background
+            ctx.save();
+            if (shake > 0) {
+                ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+                shake *= .82;
+                if (shake < .5) shake = 0;
+            }
+
+            const bg = ctx.createLinearGradient(0, 0, 0, H);
+            if (level >= 5) {
+                bg.addColorStop(0, '#3a0505'); bg.addColorStop(1, '#000');
+            } else if (freezeLeft > 0) {
+                bg.addColorStop(0, '#051a3a'); bg.addColorStop(1, '#000');
+            } else {
+                bg.addColorStop(0, '#0a0a2a'); bg.addColorStop(1, '#000');
+            }
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, W, H);
+
+            // Spawn Bubbles
+            const effLvl = Math.min(level, MAX_LEVELS);
+            const interval = Math.max(350, 1400 - (effLvl - 1) * 220);
+            if (now - lastSpawn > interval) {
+                bubbles.push(mkBubble(effLvl));
+                lastSpawn = now;
+            }
+
+            // Finger lerp + trail
+            if (fingerX !== null) {
+                lerpX += (fingerX - lerpX) * .4;
+                lerpY += (fingerY - lerpY) * .4;
+                trail.push({ x: lerpX, y: lerpY });
+                if (trail.length > 12) trail.shift();
+                handPrompt.classList.remove('visible');
+            } else {
+                trail = [];
+                handPrompt.classList.add('visible');
+            }
+
+            // Bubble Physics
+            const bubbleDt = freezeLeft > 0 ? 0 : eDt;
+            const gravity = H * 0.00025; // Responsive gravity
+
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                const b = bubbles[i];
+
+                if (b.zigzag && freezeLeft <= 0) {
+                    b.baseX += b.vx * bubbleDt;
+                    b.x = b.baseX + Math.sin(now * 0.004 + b.seed) * (W * 0.1);
+                } else {
+                    b.x += b.vx * bubbleDt;
+                    b.baseX = b.x;
+                }
+                b.y += b.vy * bubbleDt;
+                b.vy += gravity * bubbleDt;
+
+                if (!b.burst && !b.escaped && b.y > H + b.r + 10) {
+                    b.escaped = true;
+                    if (['normal', 'split', 'mini'].includes(b.type)) loseLife();
+                    bubbles.splice(i, 1);
+                    continue;
+                }
+
+                if (b.burst) { bubbles.splice(i, 1); continue; }
+
+                // Collision (Only with AI finger)
+                if (fingerX !== null) {
+                    const dx = b.x - lerpX, dy = b.y - lerpY;
+                    // Hitbox scales with base size
+                    const hitbox = b.r + (Math.max(W, H) * 0.02);
+                    if (dx * dx + dy * dy < hitbox * hitbox) {
+                        b.burst = true;
+
+                        if (b.type === 'bomb') {
+                            loseLife();
+                            shake = 25; playBomb();
+                            for (let n = 0; n < 30; n++) spawnParticle(b.x, b.y, b.solid, 1.5);
+                            comboTexts.push({ x: b.x, y: b.y, text: 'BOOM!', life: 1.5, combo: false, color: '#f00' });
+                            bubbles.splice(i, 1);
+                            continue;
+                        }
+
+                        if (now - lastSlice < 450) comboCount++; else comboCount = 1;
+                        lastSlice = now;
+
+                        let basePts = comboCount >= 3 ? 3 : comboCount === 2 ? 2 : 1;
+                        if (b.type === 'gold') basePts = 5;
+                        if (b.type === 'mini') basePts = 1;
+
+                        const mult = multiplierLeft > 0 ? 2 : 1;
+                        const totalPts = basePts * mult;
+                        score += totalPts;
+
+                        const newLvl = Math.min(Math.floor(score / PTS_PER_LEVEL) + 1, MAX_LEVELS);
+                        if (newLvl > level) { level = newLvl; levelUpLife = 2.0; playLevelUp(); }
+
+                        let popText = `+${totalPts}`;
+                        let popColor = b.solid;
+
+                        if (b.type === 'freeze') {
+                            freezeLeft = 4000; popText = "FREEZE!"; popColor = '#0ff'; playPowerup();
+                        } else if (b.type === 'shield') {
+                            if (lives < MAX_LIVES) { lives++; renderHearts(lives); popText = "+1 LIFE!"; }
+                            else { score += 50 * mult; popText = `+${50 * mult} PTS!`; }
+                            popColor = '#0f0'; playPowerup();
+                        } else if (b.type === 'multiplier') {
+                            multiplierLeft = 10000; popText = "2X SCORE!"; popColor = '#ff4500'; playPowerup();
+                        } else if (b.type === 'split') {
+                            bubbles.push(mkBubble(level, 'mini', b.x - b.r, b.y, b.vy - (H * 0.002)));
+                            bubbles.push(mkBubble(level, 'mini', b.x + b.r, b.y, b.vy - (H * 0.002)));
+                        } else if (comboCount > 1) {
+                            popText = `x${comboCount} COMBO! ${popText}`;
+                            popColor = '#0ff';
+                        }
+
+                        comboTexts.push({ x: b.x, y: b.y, text: popText, life: 1.0, color: popColor });
+
+                        shake = 5 + comboCount * 2;
+                        if (!['freeze', 'shield', 'multiplier'].includes(b.type)) playPop(comboCount);
+                        try { if (navigator.vibrate) navigator.vibrate(25 + comboCount * 10); } catch (e) { }
+
+                        for (let n = 0; n < 16; n++) spawnParticle(b.x, b.y, b.solid);
+                        updateHUD();
+                        bubbles.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                ctx.save();
+                ctx.translate(b.x, b.y);
+
+                let renderR = Math.max(1, b.r);
+                if (b.type === 'bomb') {
+                    const pulse = 1 + Math.sin(now * 0.015) * 0.12;
+                    ctx.scale(pulse, pulse);
+                }
+
+                const g = ctx.createRadialGradient(-renderR * .3, -renderR * .3, renderR * .1, 0, 0, renderR);
+                g.addColorStop(0, 'rgba(255,255,255,.85)');
+                g.addColorStop(.3, b.color);
+                g.addColorStop(1, 'rgba(255,255,255,.05)');
+                ctx.beginPath(); ctx.arc(0, 0, renderR, 0, Math.PI * 2);
+                ctx.fillStyle = g; ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+                ctx.fillStyle = 'rgba(255,255,255,.65)';
+                ctx.beginPath(); ctx.ellipse(-renderR * .38, -renderR * .38, renderR * .28, renderR * .14, Math.PI / 4, 0, Math.PI * 2); ctx.fill();
+
+                if (b.icon) {
+                    ctx.font = `${Math.max(12, renderR)}px system-ui`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(b.icon, 0, 0);
+                }
+                ctx.restore();
+            }
+
+            const particleGravity = H * 0.0004;
+            for (let p of pPool) {
+                if (!p.active) continue;
+                p.x += p.vx * eDt; p.y += p.vy * eDt;
+                p.vy += particleGravity * eDt; p.life -= .03 * eDt;
+                if (p.life <= 0) { p.active = false; continue; }
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1, Math.min(W, H) * 0.003), 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            if (trail.length > 1) {
+                ctx.lineWidth = Math.max(3, Math.min(W, H) * 0.01); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.strokeStyle = multiplierLeft > 0 ? '#ff4500' : '#0ff';
+                ctx.beginPath();
+                ctx.moveTo(trail[0].x, trail[0].y);
+                for (let i = 1; i < trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
+                ctx.stroke();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, Math.min(W, H) * 0.004); ctx.stroke();
+            }
+
+            for (let i = comboTexts.length - 1; i >= 0; i--) {
+                const ct = comboTexts[i];
+                ct.life -= .022 * eDt;
+                ct.y -= (H * 0.001) * eDt; // responsive rise
+                if (ct.life <= 0) { comboTexts.splice(i, 1); continue; }
+                ctx.globalAlpha = Math.max(0, ct.life);
+                ctx.fillStyle = ct.color || '#fff';
+                ctx.font = `bold ${Math.max(16, Math.min(W, H) * 0.025)}px system-ui,sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                ctx.strokeText(ct.text, ct.x, ct.y);
+                ctx.fillText(ct.text, ct.x, ct.y);
+                ctx.globalAlpha = 1;
+            }
+
+            if (levelUpLife > 0) {
+                levelUpLife -= .012 * eDt;
+                ctx.globalAlpha = Math.min(1, levelUpLife);
+                ctx.fillStyle = '#d946ef'; ctx.font = `bold italic ${Math.max(24, Math.min(W, H) * 0.06)}px system-ui,sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
+                const ll = level >= MAX_LEVELS ? 'MAX LEVEL! ★' : `LEVEL ${Math.min(level, MAX_LEVELS)}!`;
+                ctx.strokeText(ll, W / 2, H / 3); ctx.fillText(ll, W / 2, H / 3);
+                ctx.globalAlpha = 1;
+            }
+
+            if (missLife > 0) {
+                missLife -= .022 * eDt;
+                ctx.globalAlpha = Math.min(1, missLife);
+                ctx.fillStyle = '#f43f5e'; ctx.font = `bold ${Math.max(20, Math.min(W, H) * 0.04)}px system-ui,sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                const ml = lives <= 0 ? 'GAME OVER!' : 'MISSED! -1 LIFE';
+                ctx.strokeText(ml, W / 2, H / 2); ctx.fillText(ml, W / 2, H / 2);
+                ctx.globalAlpha = 1;
+            }
+
+            ctx.restore();
+        }
+
+        document.addEventListener('keydown', e => {
+            if (document.getElementById('screen-initials').classList.contains('hidden')) return;
+
+            const key = e.key.toUpperCase();
+            if (key.length === 1 && key >= 'A' && key <= 'Z') {
+                initLetters[initCursor] = ALPHA.indexOf(key);
+                renderInitSlots();
+                if (initCursor < 2) { initCursor++; renderInitSlots(); }
+                e.preventDefault();
+            } else if (e.key === 'Backspace') {
+                if (initCursor > 0) initCursor--;
+                initLetters[initCursor] = 0; renderInitSlots(); e.preventDefault();
+            } else if (e.key === 'Enter' || e.key === 'Return') {
+                confirmInitials(); e.preventDefault();
+            } else if (e.key === 'ArrowUp') {
+                nudgeLetter(initCursor, 1); e.preventDefault();
+            } else if (e.key === 'ArrowDown') {
+                nudgeLetter(initCursor, -1); e.preventDefault();
+            } else if (e.key === 'ArrowRight' && initCursor < 2) {
+                initCursor++; renderInitSlots(); e.preventDefault();
+            } else if (e.key === 'ArrowLeft' && initCursor > 0) {
+                initCursor--; renderInitSlots(); e.preventDefault();
+            }
+        });
+
+        requestAnimationFrame(t => { lastFrame = t; requestAnimationFrame(loop); });
+
+        // ─── AI Tracking Setup (STRICTLY REQUIRED NOW) ────────────────────────────────
+        (async function loadAI() {
+            const vid = document.getElementById('vid');
+            const startBtn = document.getElementById('start-btn');
+            const loadText = document.getElementById('loading-text');
+            const spinner = document.getElementById('loading-spinner');
+
+            try {
+                const urls = [
+                    'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
+                    'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'
+                ];
+                for (const url of urls) {
+                    await new Promise((res, rej) => {
+                        const s = document.createElement('script');
+                        s.src = url; s.crossOrigin = 'anonymous';
+                        s.onload = res; s.onerror = rej;
+                        document.body.appendChild(s);
+                    });
+                }
+
+                if (!window.Hands || !window.Camera) {
+                    loadText.textContent = "Error: AI scripts failed to load. Please refresh.";
+                    spinner.style.display = 'none';
+                    return;
+                }
+
+                let aiWorking = false;
+                const hands = new window.Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+                hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: .4, minTrackingConfidence: .4 });
+                hands.onResults(res => {
+                    aiWorking = false;
+                    if (res.multiHandLandmarks?.length > 0) {
+                        const lm = res.multiHandLandmarks[0][8];
+                        fingerX = (1 - lm.x) * W;
+                        fingerY = lm.y * H;
+                    } else {
+                        fingerX = fingerY = null;
+                    }
+                });
+
+                const cam = new window.Camera(vid, {
+                    onFrame: async () => {
+                        if (aiWorking || !running) return;
+                        aiWorking = true;
+                        await hands.send({ image: vid });
+                    },
+                    width: 320, height: 240
+                });
+
+                // Attempt camera access
+                cam.start().then(() => {
+                    // Camera success!
+                    aiReady = true;
+                    startBtn.disabled = false;
+                    startBtn.style.opacity = 1;
+                    startBtn.style.cursor = 'pointer';
+                    startBtn.textContent = '▶ Start Game';
+                    loadingEl.classList.add('hidden');
+                }).catch(err => {
+                    // Camera blocked or unavailable
+                    console.error('Camera access denied or failed.', err);
+                    loadText.textContent = "Camera Access Required to Play. Please allow permissions and refresh.";
+                    spinner.style.display = 'none';
+                    // Do not hide loading screen, they cannot play without camera.
+                });
+
+            } catch (e) {
+                console.error('AI load error:', e);
+                loadText.textContent = "Error: Something went wrong loading the game. Please check your connection and refresh.";
+                spinner.style.display = 'none';
+            }
+        })();
+    </script>
+</body>
+
+</html>
